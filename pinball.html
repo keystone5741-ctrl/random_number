@@ -115,10 +115,10 @@
   <header>
     <div class="title">
       <h1>🎯 로또 핀볼 추첨기</h1>
-      <p>45개의 공이 랜덤한 자리에서 우르르 떨어져요. GOAL에 먼저 들어온 6개가 당첨!</p>
+      <p>45개의 공이 랜덤한 자리에서 우르르 떨어져요. 사라진 공은 다시 태어나고, GOAL에 먼저 들어온 6개가 당첨!</p>
     </div>
     <div class="right">
-      <div class="status"><span>골인 <b id="count">0</b> / 6</span><span id="left" style="color:var(--muted)">남은 공 45</span><button id="mute" title="소리 켜기/끄기">🔊</button></div>
+      <div class="status"><span>골인 <b id="count">0</b> / 6</span><span id="left" style="color:var(--muted)">대기 중인 공 45</span><button id="mute" title="소리 켜기/끄기">🔊</button></div>
       <a class="switch" href="./index.html">🎱 유리구 버전으로</a>
     </div>
   </header>
@@ -141,7 +141,7 @@
   <div class="slot" data-i="6"></div>
 </div>
 
-<div id="hint">버튼을 누르면 공이 쏟아져요. 블랙홀과 OUT에 빠진 공은 사라집니다!</div>
+<div id="hint">버튼을 누르면 공이 쏟아져요. 블랙홀과 OUT에 빠진 공은 위에서 다시 태어나요!</div>
 <div id="toast"></div>
 <canvas id="confetti"></canvas>
 
@@ -180,7 +180,7 @@
   const TOP = 12.5;         // 공이 나타나는 높이
   const FLOOR = -9.4;       // 포켓 바닥
   const HIDE_Y = -16;       // 이 아래로 떨어지면 사라짐
-  const GOAL_HALF = 2.0;    // GOAL 포켓 절반 너비
+  const GOAL_HALF = 1.3;    // GOAL 포켓 절반 너비
   const PICK_MAX = 6;
   const COLOR_RANGES = [[10, '#FBC400'], [20, '#69C8F2'], [30, '#FF7272'], [40, '#AAAAAA'], [45, '#B0D840']];
   const ballColor = n => COLOR_RANGES.find(([max]) => n <= max)[1];
@@ -283,8 +283,8 @@
     }
     // 범퍼 3개: 근처 핀을 치우고 배치
     const bumpers = [];
-    for (let i = 0; i < 3 && pegs.length; i++) {
-      const cand = pegs.filter(p => p.y < 8.5 && p.y > -3 && Math.abs(p.x) < 6 && bumpers.every(b => Math.hypot(b.x - p.x, b.y - p.y) > 3.5));
+    for (let i = 0; i < 4 && pegs.length; i++) {
+      const cand = pegs.filter(p => p.y < 8.5 && p.y > -4 && Math.abs(p.x) < 6 && bumpers.every(b => Math.hypot(b.x - p.x, b.y - p.y) > 3.2));
       if (!cand.length) break;
       const c = cand[Math.floor(Math.random() * cand.length)];
       const b = { x: c.x, y: c.y, r: 0.65, bumper: true, flash: 0 };
@@ -303,20 +303,16 @@
       }
       if (h) holes.push(h);
     }
-    // 바닥 포켓 칸막이 (GOAL: |x| < 2, OUT: 2~5, 5~8)
-    for (const x of [-5, -2, 2, 5]) {
+    // 바닥 포켓 칸막이 (GOAL: |x| < 1.3, OUT: 1.3~4.4, 4.4~8)
+    for (const x of [-4.4, -GOAL_HALF, GOAL_HALF, 4.4]) {
       segments.push({ ax: x, ay: FLOOR, bx: x, by: FLOOR + 2.2, r: 0.1, divider: true });
-    }
-    // 양쪽 벽에서 가운데로 공을 흘려보내는 경사 가이드 (틈으로 OUT 되기도 함)
-    for (const sx of [-1, 1]) {
-      segments.push({ ax: sx * 7.95, ay: -3.9, bx: sx * 3.4, by: -6.5, r: 0.12 });
     }
     const segDist = (p, s) => {
       const abx = s.bx - s.ax, aby = s.by - s.ay;
       const t = Math.max(0, Math.min(1, ((p.x - s.ax) * abx + (p.y - s.ay) * aby) / (abx * abx + aby * aby)));
       return Math.hypot(p.x - (s.ax + abx * t), p.y - (s.ay + aby * t));
     };
-    pegs = pegs.filter(p => segments.every(sg => segDist(p, sg) > (p.bumper ? 1.9 : 1.15)));
+    pegs = pegs.filter(p => segments.every(sg => segDist(p, sg) > (p.bumper ? 1.9 : 1.1)));
 
     // 메쉬 생성
     for (const p of pegs) {
@@ -352,10 +348,10 @@
       boardGroup.add(d);
     }
     // 포켓 라벨 + GOAL 바닥
-    const pocketsX = [-6.5, -3.5, 0, 3.5, 6.5];
+    const pocketsX = [-6.2, -2.85, 0, 2.85, 6.2];
     for (const px of pocketsX) {
       const isGoal = px === 0;
-      const label = new THREE.Mesh(new THREE.PlaneGeometry(isGoal ? 3.6 : 2.4, isGoal ? 1.1 : 0.8), new THREE.MeshBasicMaterial({ map: isGoal ? goalTex : outTex, transparent: false }));
+      const label = new THREE.Mesh(new THREE.PlaneGeometry(isGoal ? 2.3 : 2.4, isGoal ? 1.0 : 0.8), new THREE.MeshBasicMaterial({ map: isGoal ? goalTex : outTex, transparent: false }));
       label.position.set(px, FLOOR + 0.6, -0.3);
       boardGroup.add(label);
       if (isGoal) {
@@ -400,8 +396,8 @@
   }
 
   // ---------- 상태 ----------
-  const G = 24, REST_PEG = 0.62, REST_BUMPER = 1.05, REST_WALL = 0.7, REST_BALL = 0.55, MAX_V = 30;
-  let queue = [], running = false, nextRelease = 0, speed = 1, goals = [], goalOrder = [], sixAt = 0, finished = false, redrops = 0;
+  const G = 24, REST_PEG = 0.82, REST_BUMPER = 1.15, REST_WALL = 0.85, REST_BALL = 0.75, MAX_V = 30;
+  let queue = [], running = false, nextRelease = 0, speed = 1, goals = [], goalOrder = [], sixAt = 0, finished = false, frozen = false;
   const tweens = [];
   const easeOut = t => 1 - Math.pow(1 - t, 3);
   const easeInOut = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -412,13 +408,23 @@
     if (rebuild) buildBoard();
     tweens.length = 0;
     queue = shuffle(balls.slice());
-    running = false; goals = []; goalOrder = []; sixAt = 0; finished = false; redrops = 0;
-    for (const b of balls) { b.state = 'wait'; b.mesh.visible = false; b.mesh.scale.setScalar(1); }
+    running = false; goals = []; goalOrder = []; sixAt = 0; finished = false; frozen = false;
+    for (const b of balls) { b.state = 'wait'; b.respawned = 0; b.mesh.visible = false; b.mesh.scale.setScalar(1); }
     document.querySelectorAll('#tray .slot').forEach(s => { s.classList.remove('filled'); s.style.background = ''; s.textContent = ''; });
     $('count').textContent = '0';
-    $('left').textContent = '남은 공 ' + N;
+    $('left').textContent = '대기 중인 공 ' + N;
     $('result').hidden = true;
     updateButtons();
+  }
+
+  // 사라진 공은 큐 뒤로 돌아가 위에서 다시 떨어짐 (추첨이 끝났으면 그냥 사라짐)
+  function respawn(b) {
+    b.mesh.visible = false;
+    if (finished) { b.state = 'done'; return; }
+    b.state = 'wait';
+    b.respawned = (b.respawned || 0) + 1;
+    queue.push(b);
+    $('left').textContent = '대기 중인 공 ' + queue.length;
   }
 
   function release(b) {
@@ -435,6 +441,7 @@
   // ---------- 물리 (2D, 보드 평면) ----------
   let tickAt = 0;
   function step(dt, now) {
+    if (frozen) return;
     const falling = balls.filter(b => b.state === 'fall');
     for (const b of balls) {
       if (b.state !== 'fall' && b.state !== 'out') continue;
@@ -455,7 +462,7 @@
       if (b.x > HW - BR) { b.x = HW - BR; if (b.vx > 0) b.vx = -b.vx * REST_WALL; }
 
       if (b.state === 'out') {
-        if (b.y < HIDE_Y) { b.state = 'done'; b.mesh.visible = false; }
+        if (b.y < HIDE_Y) respawn(b);
         continue;
       }
 
@@ -472,9 +479,9 @@
           const e = p.bumper ? REST_BUMPER : REST_PEG;
           b.vx -= (1 + e) * vn * nx; b.vy -= (1 + e) * vn * ny;
           // 약간의 무작위 튐 → 매번 다른 경로
-          const j = (Math.random() - 0.5) * 1.6;
+          const j = (Math.random() - 0.5) * 2.6;
           b.vx += -ny * j; b.vy += nx * j;
-          if (p.bumper) { b.vx += nx * 5; b.vy += ny * 5; p.flash = 1; playBumper(); }
+          if (p.bumper) { b.vx += nx * 7; b.vy += ny * 7; p.flash = 1; playBumper(); }
           else { p.flash = Math.max(p.flash, 0.8); if (now - tickAt > 35) { tickAt = now; playTick(Math.min(1, Math.abs(vn) / 12)); } }
         }
       }
@@ -545,7 +552,11 @@
     const end = camera.position.clone().multiplyScalar(0.45).addScaledVector(right, 6);
     tweens.push({ b, t0: now, dur: 900, start: new THREE.Vector3(b.x, b.y, 0), mid: new THREE.Vector3(b.x, b.y + 1.2, 1.5), end });
     playDing(goals.length);
-    if (goals.length >= PICK_MAX) { sixAt = now; finished = true; }
+    if (goals.length >= PICK_MAX) {
+      sixAt = now; finished = true; running = false; frozen = true; queue = [];
+      $('left').textContent = '추첨 완료';
+      updateButtons();
+    }
   }
 
   function updateTweens(now) {
@@ -583,6 +594,7 @@
 
   function updateVisuals(dt, now) {
     for (const b of balls) {
+      if (frozen && b.state !== 'hole') continue;
       if (b.state === 'fall' || b.state === 'out') {
         b.mesh.position.set(b.x, b.y, 0);
         b.mesh.rotateOnWorldAxis(AXIS_Z, -b.vx * dt / BR);
@@ -592,7 +604,7 @@
         b.mesh.position.set(b.hx + (b.x - b.hx) * (1 - u), b.hy + (b.y - b.hy) * (1 - u), -0.25 * u);
         b.mesh.scale.setScalar(1 - u);
         b.mesh.rotation.z += 0.4;
-        if (u >= 1) { b.state = 'done'; b.mesh.visible = false; b.mesh.scale.setScalar(1); }
+        if (u >= 1) { b.mesh.scale.setScalar(1); respawn(b); }
       }
     }
     for (const p of pegs) {
@@ -615,24 +627,9 @@
     if (running && queue.length && now >= nextRelease) {
       release(queue.shift());
       nextRelease = now + 150 / speed;
-      $('left').textContent = '남은 공 ' + queue.length;
+      $('left').textContent = '대기 중인 공 ' + queue.length;
     }
-    const active = balls.some(b => b.state === 'fall' || b.state === 'hole' || b.state === 'goal');
-    if (finished) {
-      if ($('result').hidden && !tweens.length && (!active || now - sixAt > 3500)) finish();
-      return;
-    }
-    if (running && !queue.length && !active) {
-      // 6개를 못 채웠으면 사라진 공을 다시 떨어뜨림
-      const lost = balls.filter(b => b.state === 'done' || b.state === 'out');
-      if (lost.length) {
-        redrops++;
-        queue = shuffle(lost);
-        for (const b of queue) b.state = 'wait';
-        toast(`골인 ${goals.length}개… 사라진 공 ${lost.length}개를 다시 떨어뜨려요!`);
-        nextRelease = now + 600;
-      }
-    }
+    if (finished && $('result').hidden && !tweens.length && now - sixAt > 600) finish();
   }
 
   function finish() {
@@ -652,7 +649,8 @@
     });
     const sum = sorted.reduce((a, b) => a + b, 0);
     const odd = sorted.filter(n => n % 2).length;
-    $('resultMeta').innerHTML = `골인 순서: ${goalOrder.join(' → ')}<br>합계 ${sum} · 홀 ${odd} / 짝 ${6 - odd}${redrops ? ` · 재낙하 ${redrops}회` : ''} · 행운을 빌어요 🍀`;
+    const respawns = balls.reduce((a, b) => a + (b.respawned || 0), 0);
+    $('resultMeta').innerHTML = `골인 순서: ${goalOrder.join(' → ')}<br>합계 ${sum} · 홀 ${odd} / 짝 ${6 - odd} · 사라졌다 다시 태어난 공 ${respawns}개 · 행운을 빌어요 🍀`;
     saveHistory(sorted, now);
     renderHistory();
     $('result').hidden = false;
