@@ -20,6 +20,8 @@
 - 중력, 바람 기둥, 소용돌이, 난류, 공끼리의 충돌을 직접 계산한 간단한 물리 시뮬레이션
 - 효과음은 Web Audio API로 합성 (🔊 버튼으로 끌 수 있음)
 
-## GitHub Pages로 올리기
+## 온라인으로 바로 쓰기
 
-저장소 Settings → Pages 에서 브랜치를 선택하면 `index.html` 이 그대로 서비스됩니다.
+<https://keystone5741-ctrl.github.io/random_number/>
+
+`main` 브랜치에 푸시하면 GitHub Actions 워크플로(`.github/workflows/pages.yml`)가 자동으로 GitHub Pages에 배포합니다.
