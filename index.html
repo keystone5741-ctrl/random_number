@@ -36,6 +36,9 @@
   header .title { pointer-events: none; }
   header h1 { margin: 0; font-size: 22px; letter-spacing: -0.02em; text-shadow: 0 2px 12px rgba(0,0,0,.5); }
   header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  header .right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: auto; }
+  a.switch { color: var(--muted); font-size: 12px; text-decoration: none; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 999px; padding: 5px 10px; }
+  a.switch:hover { color: var(--text); }
   header .status { pointer-events: auto; background: var(--panel); border: 1px solid var(--panel-border); backdrop-filter: blur(10px); border-radius: 999px; padding: 8px 14px; font-size: 13px; white-space: nowrap; display: flex; gap: 10px; align-items: center; }
   header .status b { color: var(--accent); font-size: 16px; }
   #mute { background: none; border: 0; color: var(--text); font-size: 16px; cursor: pointer; padding: 0 2px; }
@@ -118,7 +121,10 @@
       <h1>🎱 로또 3D 추첨기</h1>
       <p>드래그로 돌려보고, 날아다니는 공을 클릭해서 6개를 골라보세요</p>
     </div>
-    <div class="status"><span>선택 <b id="count">0</b> / 6</span><button id="mute" title="소리 켜기/끄기">🔊</button></div>
+    <div class="right">
+      <div class="status"><span>선택 <b id="count">0</b> / 6</span><button id="mute" title="소리 켜기/끄기">🔊</button></div>
+      <a class="switch" href="./pinball.html">🎯 핀볼 버전으로</a>
+    </div>
   </header>
 
   <div id="bottom">
