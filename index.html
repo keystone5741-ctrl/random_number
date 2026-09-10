@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>로또 3D 추첨기</title>
+<style>
+  :root {
+    --bg1: #0b1026;
+    --bg2: #1a1f3d;
+    --panel: rgba(255, 255, 255, 0.08);
+    --panel-border: rgba(255, 255, 255, 0.16);
+    --text: #f4f6ff;
+    --muted: #aab1d6;
+    --accent: #ffcc33;
+    --accent-2: #4fd1ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+    color: var(--text);
+    background: radial-gradient(1200px 800px at 50% 20%, var(--bg2), var(--bg1) 70%);
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  #c.hover { cursor: pointer; }
+  #c.drag { cursor: grabbing; }
+
+  #ui { position: fixed; inset: 0; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  #ui > * { pointer-events: auto; }
+
+  header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; pointer-events: none; }
+  header .title { pointer-events: none; }
+  header h1 { margin: 0; font-size: 22px; letter-spacing: -0.02em; text-shadow: 0 2px 12px rgba(0,0,0,.5); }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  header .status { pointer-events: auto; background: var(--panel); border: 1px solid var(--panel-border); backdrop-filter: blur(10px); border-radius: 999px; padding: 8px 14px; font-size: 13px; white-space: nowrap; display: flex; gap: 10px; align-items: center; }
+  header .status b { color: var(--accent); font-size: 16px; }
+  #mute { background: none; border: 0; color: var(--text); font-size: 16px; cursor: pointer; padding: 0 2px; }
+
+  #bottom { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+
+  #tray { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .slot {
+    width: 58px; height: 58px; border-radius: 50%;
+    border: 2px dashed rgba(255,255,255,.28);
+    display: grid; place-items: center;
+    font-weight: 800; font-size: 22px; color: #111;
+    transition: transform .2s;
+    position: relative;
+  }
+  .slot::after { content: attr(data-i); position: absolute; color: rgba(255,255,255,.35); font-size: 12px; font-weight: 500; }
+  .slot.filled { border: 0; box-shadow: 0 6px 18px rgba(0,0,0,.45), inset -6px -8px 14px rgba(0,0,0,.18), inset 6px 8px 14px rgba(255,255,255,.35); animation: pop .5s cubic-bezier(.2,1.6,.4,1); }
+  .slot.filled::after { content: ""; }
+  @keyframes pop { 0% { transform: scale(0) rotate(-30deg); } 100% { transform: scale(1) rotate(0); } }
+
+  #controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; align-items: center; background: var(--panel); border: 1px solid var(--panel-border); backdrop-filter: blur(12px); border-radius: 16px; padding: 10px 12px; max-width: 100%; }
+  button.btn {
+    font: inherit; font-weight: 700; font-size: 14px;
+    border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer;
+    color: #111; background: var(--accent);
+    box-shadow: 0 4px 0 rgba(0,0,0,.25);
+    transition: transform .08s, filter .15s;
+  }
+  button.btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+  button.btn.secondary { background: rgba(255,255,255,.14); color: var(--text); }
+  button.btn.blue { background: var(--accent-2); }
+  button.btn:disabled { filter: grayscale(.6) brightness(.7); cursor: not-allowed; }
+  .wind { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); padding: 0 6px; }
+  .wind input { width: 110px; accent-color: var(--accent); }
+
+  #hint { position: fixed; left: 50%; top: 72px; transform: translateX(-50%); background: rgba(0,0,0,.45); border: 1px solid var(--panel-border); backdrop-filter: blur(8px); padding: 8px 14px; border-radius: 999px; font-size: 13px; color: var(--text); pointer-events: none; transition: opacity .4s; white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
+  #hint.hide { opacity: 0; }
+
+  /* result overlay */
+  #result { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(5, 8, 24, .55); backdrop-filter: blur(6px); z-index: 20; padding: 16px; }
+  #result[hidden] { display: none; }
+  #result .card { background: linear-gradient(160deg, rgba(255,255,255,.14), rgba(255,255,255,.06)); border: 1px solid var(--panel-border); border-radius: 22px; padding: 26px 22px; width: min(520px, 100%); text-align: center; box-shadow: 0 30px 80px rgba(0,0,0,.5); animation: rise .5s cubic-bezier(.2,1.2,.4,1); }
+  @keyframes rise { from { transform: translateY(30px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+  #result h2 { margin: 0 0 6px; font-size: 24px; }
+  #result .sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  #result .nums { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
+  .ball2d { width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 24px; color: #111; box-shadow: 0 8px 18px rgba(0,0,0,.45), inset -6px -8px 14px rgba(0,0,0,.18), inset 6px 8px 14px rgba(255,255,255,.4); animation: pop .6s cubic-bezier(.2,1.6,.4,1) both; }
+  .ball2d.small { width: 34px; height: 34px; font-size: 14px; animation: none; box-shadow: inset -3px -4px 8px rgba(0,0,0,.18), inset 3px 4px 8px rgba(255,255,255,.4); }
+  #result .meta { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  #result .actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+  #history { margin-top: 20px; text-align: left; border-top: 1px solid var(--panel-border); padding-top: 12px; }
+  #history summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  #history ul { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 8px; max-height: 180px; overflow: auto; }
+  #history li { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+  #history li .date { min-width: 96px; }
+  #history .clear { margin-top: 8px; background: none; border: 0; color: var(--muted); font-size: 12px; cursor: pointer; text-decoration: underline; }
+
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 30; }
+  #toast { position: fixed; left: 50%; bottom: 140px; transform: translateX(-50%); background: rgba(0,0,0,.7); padding: 8px 14px; border-radius: 999px; font-size: 13px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 40; }
+  #toast.show { opacity: 1; }
+  #nowebgl { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--muted); }
+
+  @media (max-width: 480px) {
+    header h1 { font-size: 18px; }
+    header p { display: none; }
+    .slot { width: 48px; height: 48px; font-size: 18px; }
+    button.btn { padding: 9px 11px; font-size: 13px; }
+    .wind input { width: 80px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <header>
+    <div class="title">
+      <h1>🎱 로또 3D 추첨기</h1>
+      <p>드래그로 돌려보고, 날아다니는 공을 클릭해서 6개를 골라보세요</p>
+    </div>
+    <div class="status"><span>선택 <b id="count">0</b> / 6</span><button id="mute" title="소리 켜기/끄기">🔊</button></div>
+  </header>
+
+  <div id="bottom">
+    <div id="tray">
+      <div class="slot" data-i="1"></div>
+      <div class="slot" data-i="2"></div>
+      <div class="slot" data-i="3"></div>
+      <div class="slot" data-i="4"></div>
+      <div class="slot" data-i="5"></div>
+      <div class="slot" data-i="6"></div>
+    </div>
+    <div id="controls">
+      <button class="btn" id="blow">💨 바람 켜기</button>
+      <button class="btn blue" id="auto">🎰 자동 추첨</button>
+      <button class="btn secondary" id="reset">↺ 초기화</button>
+      <label class="wind">바람 세기 <input type="range" id="wind" min="20" max="200" value="100"></label>
+    </div>
+  </div>
+</div>
+
+<div id="hint">바람을 켜고 공이 날아다닐 때 클릭해 보세요!</div>
+<div id="toast"></div>
+<canvas id="confetti"></canvas>
+
+<div id="result" hidden>
+  <div class="card">
+    <h2>🎉 이번 주 행운의 번호</h2>
+    <div class="sub" id="resultDate"></div>
+    <div class="nums" id="resultNums"></div>
+    <div class="meta" id="resultMeta"></div>
+    <div class="actions">
+      <button class="btn secondary" id="copy">📋 번호 복사</button>
+      <button class="btn" id="again">🔁 다시 추첨</button>
+    </div>
+    <details id="history">
+      <summary>최근 추첨 기록</summary>
+      <ul id="historyList"></ul>
+      <button class="clear" id="clearHistory">기록 지우기</button>
+    </details>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  if (!window.THREE) {
+    document.body.insertAdjacentHTML('beforeend', '<div id="nowebgl">3D 라이브러리를 불러오지 못했어요.<br>인터넷 연결을 확인한 뒤 새로고침해 주세요.</div>');
+    return;
+  }
+
+  // ---------- 상수 ----------
+  const N = 45;            // 공 개수
+  const R = 6.2;           // 유리구 반지름
+  const BR = 0.58;         // 공 반지름
+  const PICK_MAX = 6;
+  const COLOR_RANGES = [[10, '#FBC400'], [20, '#69C8F2'], [30, '#FF7272'], [40, '#AAAAAA'], [45, '#B0D840']];
+  const ballColor = n => COLOR_RANGES.find(([max]) => n <= max)[1];
+
+  const $ = id => document.getElementById(id);
+  const canvas = $('c');
+
+  // ---------- 렌더러 / 씬 ----------
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  } catch (e) {
+    document.body.insertAdjacentHTML('beforeend', '<div id="nowebgl">이 브라우저에서는 WebGL을 사용할 수 없어요.</div>');
+    return;
+  }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x1a2040, 0.9));
+  const key = new THREE.DirectionalLight(0xffffff, 0.9);
+  key.position.set(6, 10, 8);
+  scene.add(key);
+  const rim = new THREE.PointLight(0x7fb0ff, 0.7, 60);
+  rim.position.set(-8, 4, -6);
+  scene.add(rim);
+  const warm = new THREE.PointLight(0xffd27f, 0.5, 60);
+  warm.position.set(8, -2, 6);
+  scene.add(warm);
+
+  // 유리구
+  const glass = new THREE.Mesh(
+    new THREE.SphereGeometry(R, 64, 48),
+    new THREE.MeshPhongMaterial({ color: 0x9fd3ff, transparent: true, opacity: 0.13, shininess: 140, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false })
+  );
+  glass.renderOrder = 10;
+  scene.add(glass);
+
+  const goldMat = new THREE.MeshStandardMaterial({ color: 0xd8b64a, metalness: 0.9, roughness: 0.3 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(R + 0.04, 0.13, 16, 120), goldMat);
+  ring.rotation.x = Math.PI / 2;
+  scene.add(ring);
+
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x272c48, metalness: 0.6, roughness: 0.45 });
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 1.4, 48), darkMat);
+  neck.position.y = -R + 0.2;
+  scene.add(neck);
+  const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.4, 2.4, 64), darkMat);
+  pedestal.position.y = -R - 1.0;
+  scene.add(pedestal);
+  const trim = new THREE.Mesh(new THREE.TorusGeometry(2.7, 0.08, 12, 80), goldMat);
+  trim.rotation.x = Math.PI / 2;
+  trim.position.y = -R + 0.2;
+  scene.add(trim);
+
+  // 바람 노즐 (바닥)
+  const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 0.6, 32), goldMat);
+  nozzle.position.y = -R + 0.5;
+  scene.add(nozzle);
+
+  // ---------- 공 ----------
+  function makeTexture(n) {
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 256;
+    const g = c.getContext('2d');
+    g.fillStyle = ballColor(n);
+    g.fillRect(0, 0, 512, 256);
+    for (const cx of [128, 384]) {
+      g.beginPath();
+      g.arc(cx, 128, 80, 0, Math.PI * 2);
+      g.fillStyle = '#ffffff';
+      g.fill();
+      g.fillStyle = '#151515';
+      g.font = '900 96px "Arial Black", Arial, "Helvetica Neue", sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(String(n), cx, 136);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.encoding = THREE.sRGBEncoding;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return t;
+  }
+
+  const ballGeo = new THREE.SphereGeometry(BR, 32, 24);
+  const balls = [];
+  for (let n = 1; n <= N; n++) {
+    const mat = new THREE.MeshStandardMaterial({ map: makeTexture(n), roughness: 0.35, metalness: 0.05 });
+    const mesh = new THREE.Mesh(ballGeo, mat);
+    mesh.userData.n = n;
+    scene.add(mesh);
+    balls.push({ n, mesh, mat, p: new THREE.Vector3(), v: new THREE.Vector3(), active: true });
+  }
+  const meshes = balls.map(b => b.mesh);
+
+  function scatter() {
+    for (const b of balls) {
+      const rr = (R - BR - 0.3) * Math.cbrt(Math.random());
+      const th = Math.random() * Math.PI * 2;
+      const ph = Math.acos(2 * Math.random() - 1);
+      b.p.set(rr * Math.sin(ph) * Math.cos(th), rr * Math.cos(ph) * 0.6 - 1.5, rr * Math.sin(ph) * Math.sin(th));
+      b.v.set((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4);
+      b.mesh.position.copy(b.p);
+      b.mesh.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+    }
+  }
+
+  // ---------- 물리 ----------
+  const G = 18, LIFT = 0.75, JET = 110, TURB = 45, SWIRL = 26, DRAG = 0.35, REST = 0.55;
+  let blowing = false;
+  let wind = 1;
+  const tmpA = new THREE.Vector3(), tmpN = new THREE.Vector3(), tmpAxis = new THREE.Vector3();
+
+  function step(dt) {
+    const inner = R - BR;
+    for (const b of balls) {
+      if (!b.active) continue;
+      tmpA.set(0, -G, 0);
+      if (blowing) {
+        const hd = Math.hypot(b.p.x, b.p.z);
+        // 전체적으로 공을 띄우는 양력 + 바닥 노즐에서 위로 뿜는 바람 기둥
+        tmpA.y += G * LIFT * Math.min(wind, 1.2);
+        if (b.p.y < R * 0.3 && hd < 2.6) {
+          tmpA.y += JET * wind * (1 - hd / 2.6);
+        }
+        // 벽을 따라 도는 소용돌이
+        if (hd > 0.3) tmpA.add(tmpN.set(-b.p.z, 0, b.p.x).multiplyScalar(SWIRL * wind / hd));
+        // 난류
+        tmpA.x += (Math.random() - 0.5) * TURB * wind;
+        tmpA.y += (Math.random() - 0.5) * TURB * wind * 1.4;
+        tmpA.z += (Math.random() - 0.5) * TURB * wind;
+      }
+      b.v.addScaledVector(tmpA, dt);
+      b.v.multiplyScalar(Math.max(0, 1 - DRAG * dt));
+      b.p.addScaledVector(b.v, dt);
+
+      // 유리구 벽 충돌
+      const d = b.p.length();
+      if (d > inner) {
+        tmpN.copy(b.p).divideScalar(d);
+        b.p.copy(tmpN).multiplyScalar(inner);
+        const vn = b.v.dot(tmpN);
+        if (vn > 0) b.v.addScaledVector(tmpN, -(1 + REST) * vn);
+        b.v.multiplyScalar(0.995);
+      }
+      // 바닥 노즐 위에 올라앉기 (구멍으로 빠지지 않게)
+      if (b.p.y < -R + BR + 0.9 && Math.hypot(b.p.x, b.p.z) < 1.1 + BR) {
+        b.p.y = -R + BR + 0.9;
+        if (b.v.y < 0) b.v.y = -b.v.y * REST;
+      }
+    }
+    // 공끼리 충돌
+    const minD = BR * 2;
+    for (let i = 0; i < balls.length; i++) {
+      const a = balls[i];
+      if (!a.active) continue;
+      for (let j = i + 1; j < balls.length; j++) {
+        const c = balls[j];
+        if (!c.active) continue;
+        const dx = c.p.x - a.p.x, dy = c.p.y - a.p.y, dz = c.p.z - a.p.z;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 >= minD * minD || d2 === 0) continue;
+        const dist = Math.sqrt(d2);
+        const nx = dx / dist, ny = dy / dist, nz = dz / dist;
+        const overlap = (minD - dist) * 0.5;
+        a.p.x -= nx * overlap; a.p.y -= ny * overlap; a.p.z -= nz * overlap;
+        c.p.x += nx * overlap; c.p.y += ny * overlap; c.p.z += nz * overlap;
+        const vrel = (a.v.x - c.v.x) * nx + (a.v.y - c.v.y) * ny + (a.v.z - c.v.z) * nz;
+        if (vrel > 0) {
+          const imp = (1 + REST) * vrel * 0.5;
+          a.v.x -= nx * imp; a.v.y -= ny * imp; a.v.z -= nz * imp;
+          c.v.x += nx * imp; c.v.y += ny * imp; c.v.z += nz * imp;
+        }
+      }
+    }
+    for (const b of balls) {
+      if (!b.active) continue;
+      b.mesh.position.copy(b.p);
+      const speed = b.v.length();
+      if (speed > 0.05) {
+        tmpAxis.set(-b.v.z, 0, b.v.x);
+        if (tmpAxis.lengthSq() < 1e-6) tmpAxis.set(1, 0, 0);
+        tmpAxis.normalize();
+        b.mesh.rotateOnWorldAxis(tmpAxis, speed * dt / BR);
+      }
+    }
+  }
+
+  // ---------- 카메라 ----------
+  const cam = { theta: 0.4, phi: 1.28, dist: 17, autoRotate: true };
+  function updateCamera(dt) {
+    if (cam.autoRotate && !pointerDown) cam.theta += dt * 0.12;
+    const aspect = camera.aspect;
+    const dist = cam.dist + (aspect < 1 ? (1 / aspect - 1) * 9 : 0);
+    camera.position.set(
+      dist * Math.sin(cam.phi) * Math.sin(cam.theta),
+      dist * Math.cos(cam.phi),
+      dist * Math.sin(cam.phi) * Math.cos(cam.theta)
+    );
+    camera.lookAt(0, -0.6, 0);
+  }
+
+  function resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    confettiCanvas.width = w * (window.devicePixelRatio || 1);
+    confettiCanvas.height = h * (window.devicePixelRatio || 1);
+  }
+
+  // ---------- 입력 ----------
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2(-10, -10);
+  let pointerDown = null, dragging = false, hovered = null, pointerInside = false;
+
+  function toNDC(e) {
+    pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+    pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  }
+  function raycastBall() {
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(meshes.filter(m => m.visible), false);
+    for (const h of hits) {
+      const b = balls[h.object.userData.n - 1];
+      if (b.active) return b;
+    }
+    return null;
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    ensureAudio();
+    toNDC(e);
+    pointerDown = { x: e.clientX, y: e.clientY, th: cam.theta, ph: cam.phi };
+    dragging = false;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => {
+    toNDC(e);
+    pointerInside = true;
+    if (pointerDown) {
+      const dx = e.clientX - pointerDown.x, dy = e.clientY - pointerDown.y;
+      if (Math.hypot(dx, dy) > 6) dragging = true;
+      if (dragging) {
+        cam.theta = pointerDown.th - dx * 0.006;
+        cam.phi = Math.min(1.9, Math.max(0.5, pointerDown.ph - dy * 0.006));
+        canvas.classList.add('drag');
+      }
+    }
+  });
+  function endPointer(e) {
+    if (pointerDown && !dragging) {
+      toNDC(e);
+      const b = raycastBall();
+      if (b) pickBall(b, 'manual');
+      else if (picks.length === 0) showHint('공을 정확히 클릭해 보세요. 바람 세기를 줄이면 쉬워요!');
+    }
+    pointerDown = null;
+    dragging = false;
+    canvas.classList.remove('drag');
+    if (e.pointerType !== 'mouse') pointer.set(-10, -10);
+  }
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+  canvas.addEventListener('pointerleave', () => { pointerInside = false; });
+
+  function updateHover() {
+    let b = null;
+    if (pointerInside && !dragging && picks.length < PICK_MAX) b = raycastBall();
+    if (b !== hovered) {
+      if (hovered) { hovered.mat.emissive.setHex(0x000000); hovered.mesh.scale.setScalar(1); }
+      hovered = b;
+      if (hovered) { hovered.mat.emissive.setHex(0x554400); hovered.mesh.scale.setScalar(1.18); }
+      canvas.classList.toggle('hover', !!hovered);
+    }
+  }
+
+  // ---------- 추첨 ----------
+  const picks = [];
+  const tweens = [];
+  let auto = false, nextAutoAt = 0, pending = 0;
+  const easeOut = t => 1 - Math.pow(1 - t, 3);
+  const easeInOut = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+  function pickBall(b, source) {
+    if (!b.active || picks.length + pending >= PICK_MAX) return;
+    if (hovered === b) { hovered.mat.emissive.setHex(0x000000); hovered.mesh.scale.setScalar(1); hovered = null; }
+    b.active = false;
+    pending++;
+    hideHint();
+    const end = camera.position.clone().multiplyScalar(0.42);
+    end.y -= 2.6;
+    tweens.push({
+      b, t0: performance.now(), dur: source === 'auto' ? 1000 : 850,
+      start: b.p.clone(),
+      mid: new THREE.Vector3(0, -R + BR + 1.0, 0),
+      end,
+      done: false
+    });
+    playPop(0.6);
+  }
+
+  function updateTweens(now) {
+    for (let i = tweens.length - 1; i >= 0; i--) {
+      const tw = tweens[i];
+      const u = Math.min(1, (now - tw.t0) / tw.dur);
+      const m = tw.b.mesh;
+      if (u < 0.4) {
+        const k = easeInOut(u / 0.4);
+        m.position.lerpVectors(tw.start, tw.mid, k);
+        m.scale.setScalar(1);
+      } else {
+        const k = easeOut((u - 0.4) / 0.6);
+        m.position.lerpVectors(tw.mid, tw.end, k);
+        m.scale.setScalar(1 + k * 1.6);
+      }
+      m.rotateOnWorldAxis(tmpAxis.set(0.3, 1, 0.2).normalize(), 0.15);
+      if (u >= 1) {
+        tweens.splice(i, 1);
+        m.visible = false;
+        m.scale.setScalar(1);
+        pending--;
+        picks.push(tw.b.n);
+        fillSlot(picks.length - 1, tw.b.n);
+        playPop(1.0);
+        $('count').textContent = picks.length;
+        if (picks.length >= PICK_MAX) setTimeout(finish, 500);
+      }
+    }
+  }
+
+  function fillSlot(i, n) {
+    const s = document.querySelectorAll('#tray .slot')[i];
+    s.classList.remove('filled');
+    void s.offsetWidth; // 애니메이션 재시작
+    s.classList.add('filled');
+    s.style.background = ballColor(n);
+    s.textContent = n;
+  }
+
+  function autoTick(now) {
+    if (!auto) return;
+    if (picks.length + pending >= PICK_MAX) { auto = false; updateButtons(); return; }
+    if (now < nextAutoAt) return;
+    const candidates = balls.filter(b => b.active);
+    if (!candidates.length) return;
+    const b = candidates[Math.floor(Math.random() * candidates.length)];
+    pickBall(b, 'auto');
+    nextAutoAt = now + 1200;
+  }
+
+  function finish() {
+    const sorted = [...picks].sort((a, b) => a - b);
+    const now = new Date();
+    $('resultDate').textContent = now.toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
+    const nums = $('resultNums');
+    nums.innerHTML = '';
+    sorted.forEach((n, i) => {
+      const d = document.createElement('div');
+      d.className = 'ball2d';
+      d.style.background = ballColor(n);
+      d.style.animationDelay = (i * 0.08) + 's';
+      d.textContent = n;
+      nums.appendChild(d);
+    });
+    const sum = sorted.reduce((a, b) => a + b, 0);
+    const odd = sorted.filter(n => n % 2).length;
+    $('resultMeta').textContent = `합계 ${sum} · 홀 ${odd} / 짝 ${6 - odd} · 행운을 빌어요 🍀`;
+    saveHistory(sorted, now);
+    renderHistory();
+    $('result').hidden = false;
+    burstConfetti();
+    playFanfare();
+    updateButtons();
+  }
+
+  function reset() {
+    tweens.length = 0;
+    picks.length = 0;
+    pending = 0;
+    auto = false;
+    for (const b of balls) {
+      b.active = true;
+      b.mesh.visible = true;
+      b.mesh.scale.setScalar(1);
+      b.mat.emissive.setHex(0x000000);
+    }
+    hovered = null;
+    scatter();
+    document.querySelectorAll('#tray .slot').forEach(s => { s.classList.remove('filled'); s.style.background = ''; s.textContent = ''; });
+    $('count').textContent = '0';
+    $('result').hidden = true;
+    updateButtons();
+  }
+
+  // ---------- 버튼 ----------
+  function updateButtons() {
+    $('blow').textContent = blowing ? '🌬️ 바람 끄기' : '💨 바람 켜기';
+    $('blow').classList.toggle('secondary', blowing);
+    $('auto').textContent = auto ? '⏹ 자동 중지' : '🎰 자동 추첨';
+    $('auto').disabled = picks.length + pending >= PICK_MAX && !auto;
+  }
+  $('blow').addEventListener('click', () => {
+    ensureAudio();
+    blowing = !blowing;
+    if (blowing) showHint('공이 날아다녀요! 마음에 드는 공을 클릭하세요 👆');
+    updateButtons();
+  });
+  $('auto').addEventListener('click', () => {
+    ensureAudio();
+    if (auto) { auto = false; updateButtons(); return; }
+    if (picks.length + pending >= PICK_MAX) return;
+    auto = true;
+    blowing = true;
+    nextAutoAt = performance.now() + 900;
+    showHint('기계가 공을 뽑고 있어요… 원하는 공이 있으면 직접 클릭해도 돼요!');
+    updateButtons();
+  });
+  $('reset').addEventListener('click', () => { ensureAudio(); reset(); });
+  $('again').addEventListener('click', () => { reset(); blowing = true; updateButtons(); showHint('다시 한 번! 공을 클릭해서 골라보세요'); });
+  $('wind').addEventListener('input', e => { wind = e.target.value / 100; });
+  $('copy').addEventListener('click', async () => {
+    const text = [...picks].sort((a, b) => a - b).join(', ');
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('복사됐어요: ' + text);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); toast('복사됐어요: ' + text); } catch (e2) { toast('복사에 실패했어요'); }
+      ta.remove();
+    }
+  });
+  $('clearHistory').addEventListener('click', () => { try { localStorage.removeItem(HIST_KEY); } catch (e) {} renderHistory(); });
+
+  // ---------- 힌트 / 토스트 ----------
+  let hintTimer;
+  function showHint(msg) {
+    const h = $('hint');
+    h.textContent = msg;
+    h.classList.remove('hide');
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(hideHint, 3500);
+  }
+  function hideHint() { $('hint').classList.add('hide'); }
+  setTimeout(hideHint, 5000);
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // ---------- 기록 ----------
+  const HIST_KEY = 'lotto3d.history';
+  function loadHistory() { try { return JSON.parse(localStorage.getItem(HIST_KEY)) || []; } catch (e) { return []; } }
+  function saveHistory(nums, date) {
+    try {
+      const h = loadHistory();
+      h.unshift({ date: date.toISOString(), nums });
+      localStorage.setItem(HIST_KEY, JSON.stringify(h.slice(0, 20)));
+    } catch (e) {}
+  }
+  function renderHistory() {
+    const ul = $('historyList');
+    ul.innerHTML = '';
+    const h = loadHistory();
+    if (!h.length) { ul.innerHTML = '<li>아직 기록이 없어요</li>'; return; }
+    for (const item of h) {
+      const li = document.createElement('li');
+      const d = new Date(item.date);
+      const span = document.createElement('span');
+      span.className = 'date';
+      span.textContent = d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+      li.appendChild(span);
+      for (const n of item.nums) {
+        const b = document.createElement('span');
+        b.className = 'ball2d small';
+        b.style.background = ballColor(n);
+        b.textContent = n;
+        li.appendChild(b);
+      }
+      ul.appendChild(li);
+    }
+  }
+
+  // ---------- 사운드 ----------
+  let audioCtx = null, muted = false;
+  function ensureAudio() {
+    if (audioCtx) { if (audioCtx.state === 'suspended') audioCtx.resume(); return; }
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+  }
+  function tone(freqFrom, freqTo, dur, vol, type, delay) {
+    if (!audioCtx || muted) return;
+    const t = audioCtx.currentTime + (delay || 0);
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freqFrom, t);
+    o.frequency.exponentialRampToValueAtTime(freqTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(t);
+    o.stop(t + dur + 0.05);
+  }
+  function playPop(v) { tone(520, 180, 0.16, 0.25 * v, 'triangle'); }
+  function playFanfare() {
+    [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.35, 0.18, 'square', i * 0.13));
+  }
+  $('mute').addEventListener('click', () => {
+    muted = !muted;
+    $('mute').textContent = muted ? '🔇' : '🔊';
+  });
+
+  // ---------- 컨페티 ----------
+  const confettiCanvas = $('confetti');
+  const cctx = confettiCanvas.getContext('2d');
+  let confetti = [];
+  function burstConfetti() {
+    const W = confettiCanvas.width, H = confettiCanvas.height, dpr = window.devicePixelRatio || 1;
+    const colors = COLOR_RANGES.map(c => c[1]).concat(['#ffffff']);
+    for (let i = 0; i < 160; i++) {
+      confetti.push({
+        x: W / 2 + (Math.random() - 0.5) * W * 0.3, y: H * 0.45,
+        vx: (Math.random() - 0.5) * 18 * dpr, vy: (-12 - Math.random() * 12) * dpr,
+        w: (6 + Math.random() * 6) * dpr, h: (8 + Math.random() * 8) * dpr,
+        rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3,
+        color: colors[Math.floor(Math.random() * colors.length)], life: 1
+      });
+    }
+  }
+  function drawConfetti(dt) {
+    if (!confetti.length) return;
+    const W = confettiCanvas.width, H = confettiCanvas.height, dpr = window.devicePixelRatio || 1;
+    cctx.clearRect(0, 0, W, H);
+    for (const c of confetti) {
+      c.vy += 0.45 * dpr; c.x += c.vx; c.y += c.vy; c.vx *= 0.99; c.rot += c.vr; c.life -= dt * 0.35;
+      cctx.save();
+      cctx.globalAlpha = Math.max(0, Math.min(1, c.life));
+      cctx.translate(c.x, c.y);
+      cctx.rotate(c.rot);
+      cctx.fillStyle = c.color;
+      cctx.fillRect(-c.w / 2, -c.h / 2, c.w, c.h);
+      cctx.restore();
+    }
+    confetti = confetti.filter(c => c.life > 0 && c.y < H + 50);
+    if (!confetti.length) cctx.clearRect(0, 0, W, H);
+  }
+
+  // ---------- 루프 ----------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    const sub = 3;
+    for (let i = 0; i < sub; i++) step(dt / sub);
+    updateCamera(dt);
+    updateTweens(now);
+    autoTick(now);
+    updateHover();
+    drawConfetti(dt);
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  scatter();
+  renderHistory();
+  updateButtons();
+  requestAnimationFrame(frame);
+
+  // 테스트/디버깅용
+  window.__lotto = { balls, picks, pickBall, reset, get blowing() { return blowing; }, set blowing(v) { blowing = v; updateButtons(); } };
+})();
+</script>
+</body>
+</html>
